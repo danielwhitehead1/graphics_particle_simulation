@@ -1,21 +1,11 @@
-/*
-==========================================================================
-File:        ex2.c (skeleton)
-Authors:     Toby Howard
-==========================================================================
-*/
-
-/* The following ratios are not to scale: */
-/* Moon orbit : planet orbit */
-/* Orbit radius : body radius */
-/* Sun radius : planet radius */
-
 #include <GL/glut.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+
+#define CORRECTION 10000
 
 #define RUN_SPEED  1
 #define TURN_ANGLE 4.0
@@ -93,8 +83,11 @@ float emitterYSpeed[MAX_EMITTERS];
 float emitterZSpeed[MAX_EMITTERS];
 char sign[2][2][2];
 
-float B; /* Magnetic field charge */
+/* Variables to control state */
 bool FIELD_ACTIVE;
+bool RENDER_PARTICLES;
+
+float B; /* Magnetic field charge */
 float xAcceleration;
 float zAcceleration;
 float xAbsAcceleration;
@@ -124,6 +117,9 @@ void calculateForce(float vX, float vZ);
 void initParticle(int i, int emitter);
 void initParticles(int emitter);
 int findUnusedParticle(int emitter);
+void drawBeta();
+void drawGamma();
+void drawAlpha();
 
 float myRand (void)
 {
@@ -160,7 +156,8 @@ void createMenu() {
   glutAddMenuEntry("Toggle Alpha", 1);
   glutAddMenuEntry("Toggle Beta", 2);
   glutAddMenuEntry("Toggle Gamma", 3);
-  glutAddMenuEntry("Quit", 4);
+  glutAddMenuEntry("Toggle Render", 4);
+  glutAddMenuEntry("Quit", 5);
   glutAttachMenu(GLUT_RIGHT_BUTTON);
 }
 
@@ -238,6 +235,7 @@ void init(void)
 
   B = 1.0f;
   FIELD_ACTIVE = false;
+  RENDER_PARTICLES = true;
   
   initEmitters();
   int emitter;
@@ -281,8 +279,11 @@ void menu(int menuentry) {
       startTime[GAMMA] = glutGet(GLUT_ELAPSED_TIME);
       oldTimeElapsed[GAMMA] = 0;
       initParticles(GAMMA);
-    }; break;              
-  case 4: exit(0);
+    }; break;
+  case 4: 
+    RENDER_PARTICLES = !RENDER_PARTICLES;
+    break;                
+  case 5: exit(0);
   }
 }
 
@@ -329,16 +330,18 @@ void accelerateParticle(float vX, float vZ, int emitter, int i, float q) {
 void animateParticles() {
   int i, emitter;
   for(emitter = 0; emitter < MAX_EMITTERS; emitter++) {
-    for(i = 0; i < totalParticles[emitter] + 50000 || i < MAX_PARTICLES; i++) {
-      if(particles[emitter][i].life > 0) {
-        if(FIELD_ACTIVE) { accelerateParticle(particles[emitter][i].vX, particles[emitter][i].vZ, emitter, i, emitters[emitter].charge); }
-        particles[emitter][i].x += particles[emitter][i].vX * deltaTime[emitter];
-        particles[emitter][i].y += particles[emitter][i].vY * deltaTime[emitter];
-        particles[emitter][i].z += particles[emitter][i].vZ * deltaTime[emitter];
-        particles[emitter][i].life -= deltaTime[emitter] / 3;
-        if(particles[emitter][i].life <= 0) {
-          totalParticles[emitter]--;
-          initParticle(i, emitter);
+    if(emitters[emitter].size > 0) {
+      for(i = 0; i < totalParticles[emitter] + 50000 || i < MAX_PARTICLES; i++) {
+        if(particles[emitter][i].life > 0) {
+          if(FIELD_ACTIVE) { accelerateParticle(particles[emitter][i].vX, particles[emitter][i].vZ, emitter, i, emitters[emitter].charge); }
+          particles[emitter][i].x += particles[emitter][i].vX * deltaTime[emitter];
+          particles[emitter][i].y += particles[emitter][i].vY * deltaTime[emitter];
+          particles[emitter][i].z += particles[emitter][i].vZ * deltaTime[emitter];
+          particles[emitter][i].life -= deltaTime[emitter] / 3;
+          if(particles[emitter][i].life <= 0) {
+            totalParticles[emitter]--;
+            initParticle(i, emitter);
+          }
         }
       }
     }
@@ -414,89 +417,108 @@ void emitParticles() {
   }
 }
 
-void renderParticles() {
-  glPointSize(3.0f);
-  glBegin(GL_POINTS);
-    int i;
-    for(i = 0; i < totalParticles[ALPHA] + 50000 || i < MAX_PARTICLES; i++) {
-      if(particles[ALPHA][i].life > 0) {
-        glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
-        glVertex3f(particles[ALPHA][i].x, particles[ALPHA][i].y, particles[ALPHA][i].z);
-      }
-    }
-  glEnd();
+void drawBeta() {
+  glBegin(GL_QUADS);
+  float x,y,z;
+  float s = 0.05;
+  int i;
+  for(i = 0; i < totalParticles[BETA] + CORRECTION || i < MAX_PARTICLES; i++) {
+    if(particles[BETA][i].life > 0) {
+      x = particles[BETA][i].x;
+      y = particles[BETA][i].y;
+      z = particles[BETA][i].z;
+      // top
+      glColor3f(169/250.0f, 169/250.0f, 169/250.0f);
+      glNormal3f(0.0f, 1.0f, 0.0f);
+      glVertex3f(x, y - s, z - s);
+      glVertex3f(x, y - s, z);
+      glVertex3f(x - s, y - s, z);
+      glVertex3f(x - s, y - s, z - s);
+     
+      // front
+      glColor3f(128/250.0f, 128/250.0f, 128/250.0f);
+      glNormal3f(-1.0f, 0.0f, 0.0f);
+      glVertex3f(x - s, y, z);
+      glVertex3f(x - s, y, z - s);
+      glVertex3f(x - s, y - s, z - s);
+      glVertex3f(x - s, y - s, z);
 
+     
+      // right
+      glColor3f(192/250.0f, 192/250.0f, 192/250.0f);
+      glNormal3f(0.0f, 0.0f, -1.0f);
+      glVertex3f(x - s, y, z - s);
+      glVertex3f(x, y, z - s);
+      glVertex3f(x, y - s, z - s);
+      glVertex3f(x - s, y - s, z - s);
+
+      // left
+      glColor3f(192/250.0f, 192/250.0f, 192/250.0f);
+      glNormal3f(0.0f, 0.0f, 1.0f);
+      glVertex3f(x, y, z);
+      glVertex3f(x - s, y, z);
+      glVertex3f(x - s, y - s, z);
+      glVertex3f(x, y - s, z);
+
+      // bottom
+      glColor3f(169/250.0f, 169/250.0f, 169/250.0f);
+      glNormal3f(0.0f, -1.0f, 0.0f);
+      glVertex3f(x, y, z);
+      glVertex3f(x, y, z - s);
+      glVertex3f(x - s, y, z - s);
+      glVertex3f(x - s, y, z);
+
+      // back
+      glColor3f(128/250.0f, 128/250.0f, 128/250.0f);
+      glNormal3f(-1.0f, 0.0f, 0.0f);
+      glVertex3f(x, y, z - s);
+      glVertex3f(x, y , z);
+      glVertex3f(x, y - s, z);
+      glVertex3f(x, y - s, z - s);
+    }
+  }
+  glEnd();
+}
+
+void drawGamma() {
   glLineWidth(2.5); 
   glColor3f(1.0, 0.0, 0.0);
   glBegin(GL_LINES);
-  for(i = 0; i < totalParticles[GAMMA] + 50000 || i < MAX_PARTICLES; i++) {
+  int i;
+  for(i = 0; i < totalParticles[GAMMA] + CORRECTION || i < MAX_PARTICLES; i++) {
       if(particles[GAMMA][i].life > 0) {
         glVertex3f(particles[GAMMA][i].x, particles[GAMMA][i].y, particles[GAMMA][i].z);
         glVertex3f(particles[GAMMA][i].x + 0.2, particles[GAMMA][i].y, particles[GAMMA][i].z);
       }
     }
   glEnd();
+}
 
-  glBegin(GL_QUADS);
-  float x,y,z;
-  float s = 0.05;
-  for(i = 0; i < totalParticles[BETA] + 50000 || i < MAX_PARTICLES; i++) {
-      if(particles[BETA][i].life > 0) {
-        x = particles[BETA][i].x;
-        y = particles[BETA][i].y;
-        z = particles[BETA][i].z;
-        // top
-        glColor3f(169/250.0f, 169/250.0f, 169/250.0f);
-        glNormal3f(0.0f, 1.0f, 0.0f);
-        glVertex3f(x, y - s, z - s);
-        glVertex3f(x, y - s, z);
-        glVertex3f(x - s, y - s, z);
-        glVertex3f(x - s, y - s, z - s);
-       
-        // front
-        glColor3f(128/250.0f, 128/250.0f, 128/250.0f);
-        glNormal3f(-1.0f, 0.0f, 0.0f);
-        glVertex3f(x - s, y, z);
-        glVertex3f(x - s, y, z - s);
-        glVertex3f(x - s, y - s, z - s);
-        glVertex3f(x - s, y - s, z);
-
-       
-        // right
-        glColor3f(192/250.0f, 192/250.0f, 192/250.0f);
-        glNormal3f(0.0f, 0.0f, -1.0f);
-        glVertex3f(x - s, y, z - s);
-        glVertex3f(x, y, z - s);
-        glVertex3f(x, y - s, z - s);
-        glVertex3f(x - s, y - s, z - s);
-
-        // left
-        glColor3f(192/250.0f, 192/250.0f, 192/250.0f);
-        glNormal3f(0.0f, 0.0f, 1.0f);
-        glVertex3f(x, y, z);
-        glVertex3f(x - s, y, z);
-        glVertex3f(x - s, y - s, z);
-        glVertex3f(x, y - s, z);
-
-        // bottom
-        glColor3f(169/250.0f, 169/250.0f, 169/250.0f);
-        glNormal3f(0.0f, -1.0f, 0.0f);
-        glVertex3f(x, y, z);
-        glVertex3f(x, y, z - s);
-        glVertex3f(x - s, y, z - s);
-        glVertex3f(x - s, y, z);
-
-        // back
-        glColor3f(128/250.0f, 128/250.0f, 128/250.0f);
-        glNormal3f(-1.0f, 0.0f, 0.0f);
-        glVertex3f(x, y, z - s);
-        glVertex3f(x, y , z);
-        glVertex3f(x, y - s, z);
-        glVertex3f(x, y - s, z - s);
+void drawAlpha() {
+  glPointSize(3.0f);
+  glBegin(GL_POINTS);
+    int i;
+    for(i = 0; i < totalParticles[ALPHA] + CORRECTION || i < MAX_PARTICLES; i++) {
+      if(particles[ALPHA][i].life > 0) {
+        glColor4f(1.0f, 1.0f, 1.0f, 0.5f);
+        glVertex3f(particles[ALPHA][i].x, particles[ALPHA][i].y, particles[ALPHA][i].z);
       }
     }
   glEnd();
+}
 
+void renderParticles() {
+  if(emitters[ALPHA].size > 0) {
+    drawAlpha();
+  }
+
+  if(emitters[GAMMA].size > 0) {
+    drawGamma();
+  }
+
+  if(emitters[BETA].size > 0) {
+    drawBeta();
+  }
   glFlush();
 }
 
@@ -532,7 +554,9 @@ void display(void)
 
   renderEmitters();
 
-  renderParticles();
+  if(RENDER_PARTICLES) {
+    renderParticles();
+  }
   emitParticles();
 
   glutSwapBuffers();
@@ -573,11 +597,11 @@ void keyboard(unsigned char key, int x, int y)
       resetParticles();
       break;
     case 52: /* 4 Key */
-      emitSpeed = 3100;
+      emitSpeed = 2500;
       resetParticles();
       break;
     case 53: /* 5 Key */
-      emitSpeed = 5000;
+      emitSpeed = 2800;
       resetParticles();
       break;
     case 115: /* s key to increase particle emittion */
@@ -650,19 +674,25 @@ void keyboard(unsigned char key, int x, int y)
       break;
     case 103: /* g key to increase x speed */
       for(emitter = 0; emitter < MAX_EMITTERS; emitter++) {
-        emitterXSpeed[emitter] -= 0.1f;
+        if(emitterXSpeed[emitter] > 0.2f) {
+          emitterXSpeed[emitter] -= 0.1f;
+        }
       }
       initEmitters();
       break; /* . key to toggle random x velocity */
     case 46:
       if(RAND_X) { RAND_X = false; }
       else { RAND_X = true; }
-    case 32:
+      break;
+    case 32: /* space key to reset particles */
       for(emitter = 0; emitter < MAX_EMITTERS ; emitter++) {
         startTime[emitter] = glutGet(GLUT_ELAPSED_TIME);
         oldTimeElapsed[emitter] = 0;
+        RAND_X = false;
         initParticles(emitter);
+        emitterYSpeed[emitter] = 0.0f;
       }
+      initEmitters();
       break;
   }
 }
